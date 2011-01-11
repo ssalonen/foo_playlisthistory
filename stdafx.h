@@ -6,7 +6,7 @@
 #pragma once
 
 #define COMPONENTNAME "Playlist History"
-#define COMPONENTVERSION "0.1"
+#define COMPONENTVERSION "0.1.1"
 #define COMPONENTCONFIGVERSION 1
 
 #include "targetver.h"

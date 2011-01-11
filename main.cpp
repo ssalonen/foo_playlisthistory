@@ -16,7 +16,11 @@ DECLARE_COMPONENT_VERSION(
 	"contributors:\n"
 	"Sami Salonen"
 	"\n\n"
-	COMPONENTNAME
+	"foo_playlisthistory enables playlist history in foobar2000, similar to page history in browsers."
+	"\n\n"
+	"For more information, please see the Wiki page: http://wiki.hydrogenaudio.org/index.php?title=Foobar2000:Components/Playlist_History_(foo_playlisthistory)"
+	"\n\n"
+	"Please use this thread on hydrogenaudio forums to provide feedback, or to report any bugs you might have found: http://www.hydrogenaudio.org/forums/index.php?showtopic=86082"
 );
 
 

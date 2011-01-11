@@ -5,13 +5,13 @@
 class position_tracker  {
 public:
 	position_tracker() : m_index(pfc::infinite_size) {
-	
+
 	}
 
-	 position_tracker & operator= (const position_tracker & other) {
-		 m_index = other.m_index;
-		 return *this;
-	 }		
+	position_tracker & operator= (const position_tracker & other) {
+		m_index = other.m_index;
+		return *this;
+	}		
 
 	void on_item_created(t_size p_index,const char * p_name,t_size p_name_len) {
 		if (m_index != pfc_infinite && p_index <= m_index) m_index++;
@@ -90,18 +90,18 @@ public:
 
 // For debugging
 #ifndef _DEBUG
-	void inline print_history() {}
+void inline print_history() {}
 #else
-	void inline print_history() {
-		console::formatter() << "---";
-		console::formatter() << "Playlist history (from oldest to newest):";
-		for(t_size i = 0; i < history.get_count(); i++) {
-			console::formatter() << ((position_in_history.m_index == i || 
-				(position_in_history.m_index == pfc::infinite_size && i == history.get_count()-1)) ?
-				"->" : "  ") << history[i].m_index;
-		}
-		console::formatter() << "---";
+void inline print_history() {
+	console::formatter() << "---";
+	console::formatter() << "Playlist history (from oldest to newest):";
+	for(t_size i = 0; i < history.get_count(); i++) {
+		console::formatter() << ((position_in_history.m_index == i || 
+			(position_in_history.m_index == pfc::infinite_size && i == history.get_count()-1)) ?
+			"->" : "  ") << history[i].m_index;
 	}
+	console::formatter() << "---";
+}
 #endif
 
 
@@ -121,7 +121,7 @@ public:
 	virtual void 	on_items_modified_fromplayback (t_size p_playlist, const bit_array &p_mask, play_control::t_display_level p_level) {}
 	virtual void 	on_items_replaced (t_size p_playlist, const bit_array &p_mask, const pfc::list_base_const_t< t_on_items_replaced_entry > &p_data) {}
 	virtual void 	on_item_ensure_visible (t_size p_playlist, t_size p_idx) {}
-	
+
 	virtual void 	on_playlist_activate (t_size p_old, t_size p_new);
 	virtual void 	on_playlist_created (t_size p_index, const char *p_name, t_size p_name_len);
 	virtual void 	on_playlists_reorder (const t_size *p_order, t_size p_count);
@@ -137,7 +137,7 @@ private:
 };
 
 // Remove history entries which no longer reference a valid playlist (i.e. index = pfc::infinite_size)
-void history_playlist_callback::clean_history(){
+void history_playlist_callback::clean_history() {
 	TRACK_CALL_TEXT_DEBUG("history_playlist_callback::clean_history");
 	t_size history_size = history.get_count();
 	t_size new_history_size = history_size;
@@ -178,7 +178,7 @@ void history_playlist_callback::on_playlist_activate(t_size p_old, t_size p_new)
 	}
 	t_size new_index = history.add_item(position_tracker()); 
 	history[new_index].m_index = p_new;
-	
+
 
 	while(history.get_count() > MAX_HISTORY_SIZE) {
 		history.remove_by_idx(0);
@@ -231,14 +231,15 @@ public:
 	virtual bool get_description(t_uint32 p_index, pfc::string_base & p_out);
 	virtual GUID get_parent();
 	virtual void execute(t_uint32 p_index, service_ptr_t<service_base> p_callback);
-	
+
 	// overridden
 	virtual bool get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags);
 
-	bool is_selection_enabled(t_uint32 p_index, t_size * new_pos = NULL);
+	bool is_selection_enabled(t_uint32 p_index);
+	bool is_selection_enabled(t_uint32 p_index, t_size & new_pos);	
 };
 
-	
+
 t_uint32 history_mainmenu_commands::get_command_count() {
 	return 2;
 }
@@ -282,8 +283,7 @@ bool history_mainmenu_commands::get_description(t_uint32 p_index, pfc::string_ba
 	}
 }
 
-GUID history_mainmenu_commands::get_parent()
-{
+GUID history_mainmenu_commands::get_parent() {
 	return playlisthistory_menu_guid;
 }
 
@@ -293,24 +293,22 @@ void history_mainmenu_commands::execute(t_uint32 p_index, service_ptr_t<service_
 	if(!history.get_count()) return;
 
 	t_size newpos;
-	if(is_selection_enabled(p_index, &newpos)) {
+	if(is_selection_enabled(p_index, newpos)) {
 		block_update_enabled_scope lock;
 		position_in_history.m_index = newpos;
 		static_api_ptr_t<playlist_manager>()->set_active_playlist(history[position_in_history.m_index].m_index);
 	}
 	print_history();
 }	
-	
+
 // The standard version of this command does not support checked or disabled
 // commands, so we use our own version.
-bool history_mainmenu_commands::get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags)
-{
+bool history_mainmenu_commands::get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags) {
 	TRACK_CALL_TEXT_DEBUG("history_mainmenu_commands::get_display");
 	insync(history_sync);
 	DEBUG_PRINT << "p_index = " << p_index << ". Position in history: " << position_in_history.m_index;
-#ifdef _DEBUG
 	print_history();
-#endif
+
 	p_flags = 0;
 
 	if(!is_selection_enabled(p_index))
@@ -320,32 +318,36 @@ bool history_mainmenu_commands::get_display(t_uint32 p_index, pfc::string_base &
 	return true;
 }
 
-bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index, t_size * new_pos) {
+bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index) {
+	t_size ignored;
+	return is_selection_enabled(p_index, ignored);
+}
+
+bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index, t_size & new_pos) {
 	bool valid_command = false;
 
 	switch(p_index) {
-		case 0:
-			// Activate previously activated playlist				
-			if(position_in_history.m_index == pfc::infinite_size 
-				&& history.get_count() >= 2) 
-			{									
+	case 0:
+		// Activate previously activated playlist				
+		if(position_in_history.m_index == pfc::infinite_size 
+			&& history.get_count() >= 2) {									
+			valid_command = true;
+			// Last entry should be currently active playlist, thus -2
+			new_pos = history.get_count() - 2;	
+		} else if(position_in_history.m_index != pfc::infinite_size 
+			&& position_in_history.m_index != 0) {
+				new_pos = position_in_history.m_index - 1;
 				valid_command = true;
-				// Last entry should be currently active playlist, thus -2
-				if(new_pos) *new_pos = history.get_count() - 2;	
-			} else if(position_in_history.m_index != pfc::infinite_size 
-				&& position_in_history.m_index != 0) {
-				if(new_pos) *new_pos = position_in_history.m_index - 1;
-				valid_command = true;
-			}
-			break;
-		case 1:
-			// Activate next activated playlist
-			if(position_in_history.m_index != pfc::infinite_size 
-				&& position_in_history.m_index != history.get_count()-1) {
-				if(new_pos) *new_pos = position_in_history.m_index + 1;
+		}
+		break;
+	case 1:
+		// Activate next activated playlist
+		if(position_in_history.m_index != pfc::infinite_size 
+			&& position_in_history.m_index != history.get_count()-1) {
+				new_pos = position_in_history.m_index + 1;
 				valid_command = true;					
-			}
-			break;
+		}
+		break;
 	}
 	return valid_command;
 }
