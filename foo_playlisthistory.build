@@ -10,7 +10,7 @@
 		</Project>
 	</ItemGroup>
 	<Target Name="Clean">
-		<MSBuild Projects="@(Project)" Targets="Clean" />
+		<MSBuild Projects="@(Project)" Targets="Clean" Properties="Configuration=%(Project.Configuration);Platform=%(Project.Platform)"  />
 	</Target>
 	<Target Name="Build">
 		<MSBuild Projects="@(Project)" Targets="Build" Properties="Configuration=%(Project.Configuration);Platform=%(Project.Platform)" BuildInParallel="true" />
