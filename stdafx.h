@@ -6,7 +6,7 @@
 #pragma once
 
 #define COMPONENTNAME "Playlist History"
-#define COMPONENTVERSION "0.1.1"
+#define COMPONENTVERSION "0.1.2"
 #define COMPONENTCONFIGVERSION 1
 
 #include "targetver.h"
@@ -15,6 +15,7 @@
 #include "../foobar2000/helpers/helpers.h"
 
 #include "guids.h"
+#include "config.h"
 
 #ifndef _DEBUG 
 

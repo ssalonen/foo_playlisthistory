@@ -74,6 +74,9 @@ static bool_mt update_enabled = true;
 // Mutex to control access to history
 static critical_section history_sync;
 
+// Whether active playlist is being removed. Access should be synchronized with history_sync.
+static bool active_playlist_is_being_removed = false;
+
 const static t_size MAX_HISTORY_SIZE = 50;
 
 // Helper to block updates for a while
@@ -104,6 +107,47 @@ void inline print_history() {
 }
 #endif
 
+class playlist_activator : public main_thread_callback {
+public:
+	// p_index: playlist to activate. Use infinite to denote latest in history.
+	playlist_activator(t_size p_index = pfc::infinite_size);
+	virtual void callback_run();
+
+private:
+	t_size playlist_index;
+};
+
+playlist_activator::playlist_activator(t_size p_index) : playlist_index(p_index) {
+}
+
+void playlist_activator::callback_run() {	
+	t_size index = pfc::infinite_size;
+	static_api_ptr_t<playlist_manager> playlist_api;
+
+	if(playlist_index == pfc::infinite_size) {
+		insync(history_sync);
+		t_size history_count = history.get_count();
+		if(history_count) {
+			index = history[history_count-1].m_index;
+		} else {
+			// No history entries.
+			DEBUG_PRINT << "Could not activate pfc::infinite_size playlist since there is no items in history";
+		}
+	} else {
+		// Ensure that playlist really exists
+		if(playlist_index >= playlist_api->get_playlist_count()) {
+			DEBUG_PRINT << "Playlist (" << index << ") no longer exists. Cannot activate it.";
+		} else {
+			index = playlist_index;
+		}
+	}
+
+	if(index != pfc::infinite_size) {
+		block_update_enabled_scope block_updates;
+		static_api_ptr_t<playlist_manager>()->set_active_playlist(index);
+	}
+}
+
 
 class history_playlist_callback : public playlist_callback_static {
 public:
@@ -125,7 +169,7 @@ public:
 	virtual void 	on_playlist_activate (t_size p_old, t_size p_new);
 	virtual void 	on_playlist_created (t_size p_index, const char *p_name, t_size p_name_len);
 	virtual void 	on_playlists_reorder (const t_size *p_order, t_size p_count);
-	virtual void 	on_playlists_removing (const bit_array &p_mask, t_size p_old_count, t_size p_new_count){}
+	virtual void 	on_playlists_removing (const bit_array &p_mask, t_size p_old_count, t_size p_new_count);
 	virtual void 	on_playlists_removed (const bit_array &p_mask, t_size p_old_count, t_size p_new_count);
 	virtual void 	on_playlist_renamed (t_size p_index, const char *p_new_name, t_size p_new_name_len) {}
 	virtual void 	on_default_format_changed () {}
@@ -137,6 +181,7 @@ private:
 };
 
 // Remove history entries which no longer reference a valid playlist (i.e. index = pfc::infinite_size)
+// Also updates the position_in_history
 void history_playlist_callback::clean_history() {
 	TRACK_CALL_TEXT_DEBUG("history_playlist_callback::clean_history");
 	t_size history_size = history.get_count();
@@ -179,7 +224,7 @@ void history_playlist_callback::on_playlist_activate(t_size p_old, t_size p_new)
 	t_size new_index = history.add_item(position_tracker()); 
 	history[new_index].m_index = p_new;
 
-
+	// Remove older history entries to keep history compact
 	while(history.get_count() > MAX_HISTORY_SIZE) {
 		history.remove_by_idx(0);
 		position_in_history.on_items_removed(bit_array_range(0, 1), 
@@ -209,14 +254,40 @@ void  history_playlist_callback::on_playlists_reorder (const t_size *p_order, t_
 
 	print_history();
 }
+
+void  history_playlist_callback::on_playlists_removing (const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
+	TRACK_CALL_TEXT_DEBUG("history_playlist_callback::on_playlists_removing");
+	insync(history_sync);
+	// playlist_manager::get_active_playlist returns infinite at this point for reason if the 
+	// current playlist is removed (-> unambiguity), therefore use playlist history to find out if
+	// the currently active playlist is being removed
+	t_size history_count = history.get_count();
+	t_size active_playlist_index = history_count ? history[history_count-1].m_index : pfc::infinite_size;
+	if(active_playlist_index != pfc::infinite_size) {
+		active_playlist_is_being_removed = p_mask[active_playlist_index];
+	}
+	DEBUG_PRINT << "Removing active (" << active_playlist_index 
+		<< ")playlist? " << active_playlist_is_being_removed;
+}
+
 void  history_playlist_callback::on_playlists_removed (const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
 	TRACK_CALL_TEXT_DEBUG("history_playlist_callback::on_playlists_removed");
 	insync(history_sync);
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_items_removed(p_mask, p_old_count, p_new_count);
 	}
+	// Remove obsolete playlists from history and 'invalidate' (->infinite) history
+	// position counter, if necessary
 	clean_history();
+
+	if(active_playlist_is_being_removed && cfg_after_delete_go_to_last_active_playlist) {
+		DEBUG_PRINT << "Active playlist is being removed, and 'after delete go to last active playlist' is active";				
+		
+		// Changing playlist here does not seem to work here. Let's use callback to activate last activated playlist (if any).
+		static_api_ptr_t<main_thread_callback_manager>()->add_callback(new service_impl_t<playlist_activator>());		
+	}
 	print_history();
+	active_playlist_is_being_removed = false;
 }
 
 static service_factory_single_t< history_playlist_callback > history_playlist_callback_service;
@@ -236,51 +307,74 @@ public:
 	virtual bool get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags);
 
 	bool is_selection_enabled(t_uint32 p_index);
-	bool is_selection_enabled(t_uint32 p_index, t_size & new_pos);	
+	bool is_selection_enabled(t_uint32 p_index, t_size & new_pos);
+
+private:
+	enum {
+		MENU_PREVIOUS_PLAYLIST = 0,
+		MENU_NEXT_PLAYLIST = 1,
+		MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE = 2
+	};
 };
 
 
 t_uint32 history_mainmenu_commands::get_command_count() {
-	return 2;
+	return 3;
 }
 
 GUID history_mainmenu_commands::get_command(t_uint32 p_index) {
+	GUID guid;
 	switch(p_index) {
-	case 0:
-		return previous_playlist_guid;
+	case MENU_PREVIOUS_PLAYLIST:
+		guid = previous_playlist_guid;
 		break;
-	case 1:
-		return next_playlist_guid;
+	case MENU_NEXT_PLAYLIST:
+		guid = next_playlist_guid;
+		break;
+	case MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE:
+		guid = after_delete_go_to_last_active_playlist_guid;
 		break;
 	default:
-		return pfc::guid_null;
+		guid = pfc::guid_null;
 	}
+
+	return guid;
 }
 
 void history_mainmenu_commands::get_name(t_uint32 p_index, pfc::string_base & p_out) {
 	switch(p_index) {
-	case 0:
+	case MENU_PREVIOUS_PLAYLIST:
 		p_out = "Previous playlist";
 		break;
-	case 1:
+	case MENU_NEXT_PLAYLIST:
 		p_out = "Next playlist";
+		break;
+	case MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE:
+		p_out = "After delete go to last active playlist";
 		break;
 	}
 }
 
 bool history_mainmenu_commands::get_description(t_uint32 p_index, pfc::string_base & p_out) {
+	bool return_value = false;
 	switch(p_index) {
-	case 0:
+	case MENU_PREVIOUS_PLAYLIST:
 		p_out = "Activate previously activated playlist";
-		return true;
+		return_value = true;
 		break;
-	case 1:
+	case MENU_NEXT_PLAYLIST:
 		p_out = "Activate next activated playlist";
-		return true;
+		return_value = true;
+		break;
+	case MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE:
+		p_out = "If currently active playlist is deleted, go to last active playlist";
+		return_value = true;
 		break;
 	default:
-		return false;
+		return_value = false;
 	}
+
+	return return_value;
 }
 
 GUID history_mainmenu_commands::get_parent() {
@@ -289,42 +383,67 @@ GUID history_mainmenu_commands::get_parent() {
 
 void history_mainmenu_commands::execute(t_uint32 p_index, service_ptr_t<service_base> p_callback) {
 	TRACK_CALL_TEXT_DEBUG("history_mainmenu_commands::execute");
-	insync(history_sync);
-	if(!history.get_count()) return;
-
-	t_size newpos;
-	if(is_selection_enabled(p_index, newpos)) {
-		block_update_enabled_scope lock;
-		position_in_history.m_index = newpos;
-		static_api_ptr_t<playlist_manager>()->set_active_playlist(history[position_in_history.m_index].m_index);
+	
+	switch(p_index) {
+	case MENU_PREVIOUS_PLAYLIST:
+	case MENU_NEXT_PLAYLIST:
+		{
+			insync(history_sync);
+			t_size newpos;
+			if(history.get_count() && is_selection_enabled(p_index, newpos)) {
+				block_update_enabled_scope lock;
+				position_in_history.m_index = newpos;
+				static_api_ptr_t<playlist_manager>()->set_active_playlist(history[position_in_history.m_index].m_index);
+			}
+			print_history();
+		}
+		break;
+	case MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE:
+		cfg_after_delete_go_to_last_active_playlist = !cfg_after_delete_go_to_last_active_playlist;
+		break;
 	}
-	print_history();
+	
 }	
 
 // The standard version of this command does not support checked or disabled
 // commands, so we use our own version.
 bool history_mainmenu_commands::get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags) {
-	TRACK_CALL_TEXT_DEBUG("history_mainmenu_commands::get_display");
-	insync(history_sync);
+	TRACK_CALL_TEXT_DEBUG("history_mainmenu_commands::get_display");	
 	DEBUG_PRINT << "p_index = " << p_index << ". Position in history: " << position_in_history.m_index;
 	print_history();
 
 	p_flags = 0;
 
-	if(!is_selection_enabled(p_index))
-		p_flags = flag_disabled;			
+	switch(p_index) {
+	case MENU_PREVIOUS_PLAYLIST:
+	case MENU_NEXT_PLAYLIST:
+		{
+			insync(history_sync);
+			if(!is_selection_enabled(p_index)) {
+				p_flags = flag_disabled;
+			}
+			print_history();
+		}
+		break;
+	case MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE: 
+		if(cfg_after_delete_go_to_last_active_playlist) {
+			p_flags = flag_checked;
+		}
+		break;
+	}
 
 	get_name(p_index, p_text);
 	return true;
 }
 
 bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index) {
-	t_size ignored;
+	t_size ignored;	
 	return is_selection_enabled(p_index, ignored);
 }
 
 bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index, t_size & new_pos) {
 	bool valid_command = false;
+	PFC_ASSERT(p_index == MENU_PREVIOUS_PLAYLIST || p_index == MENU_NEXT_PLAYLIST);
 
 	switch(p_index) {
 	case 0:
