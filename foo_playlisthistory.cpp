@@ -294,7 +294,7 @@ static service_factory_single_t< history_playlist_callback > history_playlist_ca
 
 
 
-class history_mainmenu_commands : public mainmenu_commands {
+class history_mainmenu_commands : public mainmenu_commands_v2 {
 public:
 	virtual t_uint32 get_command_count();
 	virtual GUID get_command(t_uint32 p_index);
@@ -303,23 +303,28 @@ public:
 	virtual GUID get_parent();
 	virtual void execute(t_uint32 p_index, service_ptr_t<service_base> p_callback);
 
+	virtual bool is_command_dynamic(t_uint32 index);
+	virtual mainmenu_node::ptr dynamic_instantiate(t_uint32 index);
+	virtual bool dynamic_execute(t_uint32 index, const GUID & subID, service_ptr_t<service_base> callback);
+
 	// overridden
 	virtual bool get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags);
 
+private:
 	bool is_selection_enabled(t_uint32 p_index);
 	bool is_selection_enabled(t_uint32 p_index, t_size & new_pos);
 
-private:
 	enum {
 		MENU_PREVIOUS_PLAYLIST = 0,
 		MENU_NEXT_PLAYLIST = 1,
-		MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE = 2
+		MENU_COMMAND_SEPARATOR = 2,
+		MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE = 3
 	};
 };
 
 
 t_uint32 history_mainmenu_commands::get_command_count() {
-	return 3;
+	return 4;
 }
 
 GUID history_mainmenu_commands::get_command(t_uint32 p_index) {
@@ -436,12 +441,34 @@ bool history_mainmenu_commands::get_display(t_uint32 p_index, pfc::string_base &
 	return true;
 }
 
+bool history_mainmenu_commands::is_command_dynamic(t_uint32 index) {
+	return index == MENU_COMMAND_SEPARATOR;
+}
+
+mainmenu_node::ptr history_mainmenu_commands::dynamic_instantiate(t_uint32 index) {
+	TRACK_CALL_TEXT_DEBUG("history_mainmenu_commands::dynamic_instantiate");
+	PFC_ASSERT(index == MENU_COMMAND_SEPARATOR);
+	if(index == MENU_COMMAND_SEPARATOR) {
+		DEBUG_PRINT << "Constructing separator";
+		return new service_impl_t<mainmenu_node_separator>();
+	} else {
+		return NULL;
+	}
+}
+
+bool history_mainmenu_commands::dynamic_execute(t_uint32 index, const GUID & subID, service_ptr_t<service_base> callback) {
+	TRACK_CALL_TEXT_DEBUG("history_mainmenu_commands::dynamic_execute");
+	PFC_ASSERT(index == MENU_COMMAND_SEPARATOR);
+	return true;
+}
+
 bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index) {
 	t_size ignored;	
 	return is_selection_enabled(p_index, ignored);
 }
 
 bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index, t_size & new_pos) {
+	TRACK_CALL_TEXT_DEBUG("history_mainmenu_commands::is_selection_enabled");
 	bool valid_command = false;
 	PFC_ASSERT(p_index == MENU_PREVIOUS_PLAYLIST || p_index == MENU_NEXT_PLAYLIST);
 
@@ -470,6 +497,8 @@ bool history_mainmenu_commands::is_selection_enabled(t_uint32 p_index, t_size & 
 	}
 	return valid_command;
 }
+
+
 
 static mainmenu_commands_factory_t< history_mainmenu_commands > history_menu;
 

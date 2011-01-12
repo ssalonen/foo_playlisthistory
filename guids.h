@@ -21,7 +21,6 @@ static const GUID after_delete_go_to_last_active_playlist_guid =
 static const GUID playlisthistory_menu_guid = 
 { 0x1ceb9647, 0x903f, 0x4890, { 0x8a, 0x1f, 0x42, 0x59, 0x1c, 0x87, 0x63, 0x78 } };
 
-
 //
 // Configuration guids
 //
