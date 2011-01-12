@@ -90,6 +90,7 @@
     <ClInclude Include="config.h" />
     <ClInclude Include="guids.h" />
     <ClInclude Include="history_mainmenu_commands.h" />
+    <ClInclude Include="history_playlist_callback.h" />
     <ClInclude Include="playlist_activator.h" />
     <ClInclude Include="playlist_history.h" />
     <ClInclude Include="position_tracker.h" />
@@ -98,8 +99,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="config.cpp" />
-    <ClCompile Include="foo_playlisthistory.cpp" />
     <ClCompile Include="history_mainmenu_commands.cpp" />
+    <ClCompile Include="history_playlist_callback.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="playlist_activator.cpp" />
     <ClCompile Include="playlist_history.cpp" />
