@@ -16,6 +16,12 @@
 
 #include "guids.h"
 #include "config.h"
+#include "position_tracker.h"
+#include "bool_mt.h"
+#include "playlist_activator.h"
+#include "playlist_history.h"
+#include "history_mainmenu_commands.h"
+
 
 #ifndef _DEBUG 
 
