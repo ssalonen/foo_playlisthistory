@@ -84,7 +84,10 @@ private:
 	// Remove history entries which no longer reference a valid playlist (i.e. index = pfc::infinite_size)
 	// Also updates the position_in_history
 	// Not synchronized!
-	void clean_history();
+	// Returns true if something is actually done
+	bool clean_history();
+
+	void clean_history_until_no_changes();
 
 	
 	// For debugging

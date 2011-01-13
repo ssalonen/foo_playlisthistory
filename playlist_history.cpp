@@ -31,7 +31,7 @@ void playlist_history_impl::on_playlist_activate(t_size p_old, t_size p_new) {
 			history.get_count(), history.get_count()-1);
 	}
 
-	clean_history(); // Just in case
+	clean_history_until_no_changes(); // Just in case
 	print_history();
 }
 
@@ -42,7 +42,7 @@ void playlist_history_impl::on_playlist_created(t_size p_index, const char *p_na
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_item_created(p_index, p_name, p_name_len);
 	}
-	clean_history();
+	clean_history_until_no_changes();
 	print_history();
 }
 
@@ -82,7 +82,7 @@ void playlist_history_impl::on_playlists_removed(const bit_array &p_mask, t_size
 	}
 	// Remove obsolete playlists from history and 'invalidate' (->infinite) history
 	// position counter, if necessary
-	clean_history();
+	clean_history_until_no_changes();
 
 	if(active_playlist_is_being_removed && cfg_after_delete_go_to_last_active_playlist) {
 		DEBUG_PRINT << "Active playlist is being removed, and 'after delete go to last active playlist' is active";				
@@ -230,13 +230,20 @@ t_size playlist_history_impl::get_playlist_matching_current_position() {
 }
 
 
-void playlist_history_impl::clean_history() {
+bool playlist_history_impl::clean_history() {
 	TRACK_CALL_TEXT_DEBUG("history_playlist_callback::clean_history");
 	t_size history_size = history.get_count();
 	t_size new_history_size = history_size;
 	bit_array_bittable helper(history_size);
 	for(t_size i = 0; i < history.get_count(); i++) {
 		if(history[i].m_index == pfc::infinite_size) {
+			DEBUG_PRINT << "Removing (inf) " << i;
+			if(!helper.get(i)) new_history_size--;
+			helper.set(i, true);
+		} else if(i > 0 && history[i-1].m_index == history[i].m_index) {
+			DEBUG_PRINT << "Removing (same) " << i;
+			// Two same playlists in the history (in the row)
+			// -> remove the latter
 			if(!helper.get(i)) new_history_size--;
 			helper.set(i, true);
 		}
@@ -252,6 +259,14 @@ void playlist_history_impl::clean_history() {
 		&& position_in_history.m_index >= history.get_count()) {
 		position_in_history.m_index = pfc::infinite_size;
 	}
+	print_history();
+
+	return new_history_size != history_size;
+}
+
+void playlist_history_impl::clean_history_until_no_changes() {
+	TRACK_CALL_TEXT_DEBUG("history_playlist_callback::clean_history_until_no_changes");
+	while(clean_history()) {}
 }
 
 // {511FD2B4-CA27-4F4F-94E0-F519CBD412B2}
