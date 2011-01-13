@@ -69,10 +69,10 @@ void history_mainmenu_commands::execute(t_uint32 p_index, service_ptr_t<service_
 	
 	switch(p_index) {
 	case MENU_PREVIOUS_PLAYLIST:
-		playlist_history::activate_previous();
+		static_api_ptr_t<playlist_history>()->activate_previous();
 		break;
 	case MENU_NEXT_PLAYLIST:
-		playlist_history::activate_next();
+		static_api_ptr_t<playlist_history>()->activate_next();
 		break;
 	case MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE:
 		cfg_after_delete_go_to_last_active_playlist = !cfg_after_delete_go_to_last_active_playlist;
@@ -90,12 +90,12 @@ bool history_mainmenu_commands::get_display(t_uint32 p_index, pfc::string_base &
 
 	switch(p_index) {
 	case MENU_PREVIOUS_PLAYLIST:
-		if(playlist_history::is_previous_valid()) {
+		if(static_api_ptr_t<playlist_history>()->is_previous_valid()) {
 			p_flags = flag_disabled;
 		}
 		break;
 	case MENU_NEXT_PLAYLIST:		
-		if(playlist_history::is_next_valid()) {
+		if(static_api_ptr_t<playlist_history>()->is_next_valid()) {
 			p_flags = flag_disabled;
 		}
 		break;

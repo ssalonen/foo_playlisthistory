@@ -3,22 +3,9 @@
 #include "stdafx.h"
 
 // Thread safe single boolean value
-class bool_mt {
+class bool_mt : public syncd_storage_flagged<bool>{
 public:
-	bool_mt(bool value = false) : m_val(value), m_sync() {
+	bool_mt(bool value = false) : syncd_storage_flagged(value) {
 
 	}
-
-	void operator() (bool value){
-		insync(m_sync);
-		m_val = value;
-	}
-
-	bool operator() (){
-		insync(m_sync);
-		return m_val;
-	}
-private:
-	bool m_val;
-	critical_section m_sync;
 };

@@ -1,18 +1,11 @@
 #include "stdafx.h"
 #include "playlist_history.h"
 
-pfc::list_t<position_tracker> playlist_history::history;
-position_tracker playlist_history::position_in_history;
-bool_mt playlist_history::update_enabled = true;
-critical_section playlist_history::history_sync;
-bool playlist_history::active_playlist_is_being_removed = false;
 
-
-
-void playlist_history::on_playlist_activate(t_size p_old, t_size p_new) {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::on_playlist_activate");	
+void playlist_history_impl::on_playlist_activate(t_size p_old, t_size p_new) {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlist_activate");	
 	insync(history_sync);
-	if(!update_enabled()) return;
+	if(!update_enabled.get()) return;
 
 	// Remove history entries after the current position
 	if(position_in_history.m_index != pfc::infinite_size) {
@@ -42,9 +35,10 @@ void playlist_history::on_playlist_activate(t_size p_old, t_size p_new) {
 	print_history();
 }
 
-void  playlist_history::on_playlist_created (t_size p_index, const char *p_name, t_size p_name_len) {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::on_playlist_created");
+void playlist_history_impl::on_playlist_created(t_size p_index, const char *p_name, t_size p_name_len) {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlist_created");
 	insync(history_sync);
+	if(!update_enabled.get()) return;
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_item_created(p_index, p_name, p_name_len);
 	}
@@ -52,9 +46,10 @@ void  playlist_history::on_playlist_created (t_size p_index, const char *p_name,
 	print_history();
 }
 
-void  playlist_history::on_playlists_reorder (const t_size *p_order, t_size p_count) {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::on_playlists_reorder");
+void playlist_history_impl::on_playlists_reorder(const t_size *p_order, t_size p_count) {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlists_reorder");
 	insync(history_sync);
+	if(!update_enabled.get()) return;
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_items_reorder(p_order, p_count);
 	}
@@ -62,9 +57,10 @@ void  playlist_history::on_playlists_reorder (const t_size *p_order, t_size p_co
 	print_history();
 }
 
-void  playlist_history::on_playlists_removing (const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::on_playlists_removing");
+void playlist_history_impl::on_playlists_removing(const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlists_removing");
 	insync(history_sync);
+	if(!update_enabled.get()) return;
 	// playlist_manager::get_active_playlist returns infinite at this point for reason if the 
 	// current playlist is removed (-> unambiguity), therefore use playlist history to find out if
 	// the currently active playlist is being removed
@@ -77,9 +73,10 @@ void  playlist_history::on_playlists_removing (const bit_array &p_mask, t_size p
 		<< ")playlist? " << active_playlist_is_being_removed;
 }
 
-void  playlist_history::on_playlists_removed (const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::on_playlists_removed");
+void playlist_history_impl::on_playlists_removed(const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlists_removed");
 	insync(history_sync);
+	if(!update_enabled.get()) return;
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_items_removed(p_mask, p_old_count, p_new_count);
 	}
@@ -97,30 +94,30 @@ void  playlist_history::on_playlists_removed (const bit_array &p_mask, t_size p_
 	active_playlist_is_being_removed = false;
 }
 
-void playlist_history::activate_previous() {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::activate_previous()");
+void playlist_history_impl::activate_previous() {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::activate_previous()");
 	t_size index;
 	if(is_previous_valid(index)) {
-		updates_disabled_scope lock;
+		updates_disabled_scope lock(this);
 		insync(history_sync);
 		position_in_history.m_index = index;
 		static_api_ptr_t<playlist_manager>()->set_active_playlist(history[index].m_index);
 	}
 }
 
-void playlist_history::activate_next() {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::activate_next()");
+void playlist_history_impl::activate_next() {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::activate_next()");
 	t_size index;
 	if(is_next_valid(index)) {
-		updates_disabled_scope lock;
+		updates_disabled_scope lock(this);
 		insync(history_sync);
 		position_in_history.m_index = index;
 		static_api_ptr_t<playlist_manager>()->set_active_playlist(history[index].m_index);
 	}
 }
 
-void playlist_history::activate_last() {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::activate_last()");
+void playlist_history_impl::activate_last() {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::activate_last()");
 	insync(history_sync);
 	position_tracker original_position = position_in_history;
 
@@ -136,26 +133,26 @@ void playlist_history::activate_last() {
 		return;
 	}
 
-	updates_disabled_scope lock;
+	updates_disabled_scope lock(this);
 	static_api_ptr_t<playlist_manager>()->set_active_playlist(playlist_index);
 }
 
-bool playlist_history::is_previous_valid() {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::is_previous_valid()");
+bool playlist_history_impl::is_previous_valid() {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::is_previous_valid()");
 	insync(history_sync);
 	t_size ignored;
 	return is_previous_valid(ignored);
 }
 
-bool playlist_history::is_next_valid() {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::is_next_valid()");
+bool playlist_history_impl::is_next_valid() {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::is_next_valid()");
 	insync(history_sync);
 	t_size ignored;
 	return is_next_valid(ignored);
 }
 
-bool playlist_history::is_previous_valid(t_size & new_position_in_history) {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::is_previous_valid(t_size)");
+bool playlist_history_impl::is_previous_valid(t_size & new_position_in_history) {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::is_previous_valid(t_size)");
 	bool valid_command = false;
 	new_position_in_history = pfc::infinite_size;
 
@@ -173,13 +170,16 @@ bool playlist_history::is_previous_valid(t_size & new_position_in_history) {
 			valid_command = true;
 	}
 
-	PFC_ASSERT(new_position_in_history < history.get_count());
+	PFC_ASSERT(new_position_in_history == pfc::infinite_size 
+		|| new_position_in_history < history.get_count());
+
+	if(valid_command) PFC_ASSERT(new_position_in_history != pfc::infinite_size);
 	
 	return valid_command;
 }
 
-bool playlist_history::is_next_valid(t_size & new_position_in_history) {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::is_next_valid(t_size)");
+bool playlist_history_impl::is_next_valid(t_size & new_position_in_history) {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::is_next_valid(t_size)");
 	bool valid_command = false;
 	new_position_in_history = pfc::infinite_size;
 
@@ -192,13 +192,16 @@ bool playlist_history::is_next_valid(t_size & new_position_in_history) {
 			valid_command = true;					
 	}
 
-	PFC_ASSERT(new_position_in_history < history.get_count());
+	PFC_ASSERT(new_position_in_history == pfc::infinite_size 
+		|| new_position_in_history < history.get_count());
+
+	if(valid_command) PFC_ASSERT(new_position_in_history != pfc::infinite_size);
 
 	return valid_command;
 }
 
-t_size playlist_history::get_playlist_matching_current_position() {
-	TRACK_CALL_TEXT_DEBUG("playlist_history::get_playlist_matching_current_position()");
+t_size playlist_history_impl::get_playlist_matching_current_position() {
+	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::get_playlist_matching_current_position()");
 	insync(history_sync);
 
 	t_size playlist_index = pfc::infinite_size;
@@ -206,7 +209,8 @@ t_size playlist_history::get_playlist_matching_current_position() {
 
 	if(!history.get_count()) return pfc::infinite_size;
 
-	PFC_ASSERT(0 <= position_in_history.m_index && position_in_history.m_index < history.get_count());
+	PFC_ASSERT(pfc::infinite_size == position_in_history.m_index 
+		|| position_in_history.m_index < history.get_count());
 
 	if(position_in_history.m_index == pfc::infinite_size) {		
 		// Get last entry
@@ -226,7 +230,7 @@ t_size playlist_history::get_playlist_matching_current_position() {
 }
 
 
-void playlist_history::clean_history() {
+void playlist_history_impl::clean_history() {
 	TRACK_CALL_TEXT_DEBUG("history_playlist_callback::clean_history");
 	t_size history_size = history.get_count();
 	t_size new_history_size = history_size;
@@ -249,3 +253,9 @@ void playlist_history::clean_history() {
 		position_in_history.m_index = pfc::infinite_size;
 	}
 }
+
+// {511FD2B4-CA27-4F4F-94E0-F519CBD412B2}
+const GUID playlist_history::class_guid = { 0x511fd2b4, 0xca27, 0x4f4f, { 0x94, 0xe0, 0xf5, 0x19, 0xcb, 0xd4, 0x12, 0xb2 } }; 
+
+// Register as entrypoint service
+static playlist_history_factory_t<playlist_history_impl> playlist_history_registered;
