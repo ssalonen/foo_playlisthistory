@@ -28,3 +28,23 @@ private:
 		MENU_AFTER_DELETE_GO_TO_LAST_ACTIVE = 3
 	};
 };
+
+// 'Restore last deleted playlist'
+class history_restore_mainmenu_commands : public mainmenu_commands {
+public:
+	virtual t_uint32 get_command_count();
+	virtual GUID get_command(t_uint32 p_index);
+	virtual void get_name(t_uint32 p_index, pfc::string_base & p_out);
+	virtual bool get_description(t_uint32 p_index, pfc::string_base & p_out);
+	virtual GUID get_parent();
+	virtual void execute(t_uint32 p_index, service_ptr_t<service_base> p_callback);
+
+	// overridden
+	virtual bool get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags);
+
+private:
+
+	enum {
+		MENU_RESTORE_PLAYLIST = 0
+	};
+};

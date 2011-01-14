@@ -16,6 +16,11 @@ static const GUID next_playlist_guid =
 static const GUID after_delete_go_to_last_active_playlist_guid = 
 { 0x983c5418, 0x6cec, 0x4e9f, { 0xb3, 0x7, 0xce, 0x9a, 0x2b, 0xb8, 0x6a, 0xba } };
 
+// {7E2E46B7-6DBA-49F7-A7E1-BCADC9EDF84D}
+static const GUID restore_playlist_guid = 
+{ 0x7e2e46b7, 0x6dba, 0x49f7, { 0xa7, 0xe1, 0xbc, 0xad, 0xc9, 0xed, 0xf8, 0x4d } };
+
+
 
 // {1CEB9647-903F-4890-8A1F-42591C876378}
 static const GUID playlisthistory_menu_guid = 

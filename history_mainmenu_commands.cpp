@@ -134,7 +134,99 @@ bool history_mainmenu_commands::dynamic_execute(t_uint32 index, const GUID & sub
 
 
 
+t_uint32 history_restore_mainmenu_commands::get_command_count() {
+	return 1;
+}
+
+GUID history_restore_mainmenu_commands::get_command(t_uint32 p_index) {
+	GUID guid;
+	switch(p_index) {
+	case MENU_RESTORE_PLAYLIST:
+		guid = restore_playlist_guid;
+		break;	
+	default:
+		guid = pfc::guid_null;
+	}
+
+	return guid;
+}
+
+void history_restore_mainmenu_commands::get_name(t_uint32 p_index, pfc::string_base & p_out) {
+	switch(p_index) {
+	case MENU_RESTORE_PLAYLIST:
+		pfc::string8 name("Restore last removed playlist");
+		static_api_ptr_t<playlist_manager_v3> recycler_api;
+		if(recycler_api->recycler_get_count()) {
+			name += " (";
+			pfc::string8 playlist_name;
+			recycler_api->recycler_get_name(0, playlist_name);
+			name += playlist_name;
+			name += ")";
+		}
+		p_out = name;
+		break;
+	}
+}
+
+bool history_restore_mainmenu_commands::get_description(t_uint32 p_index, pfc::string_base & p_out) {
+	bool return_value = false;
+	switch(p_index) {
+	case MENU_RESTORE_PLAYLIST:
+		p_out = "Restores last removed playlist";
+		return_value = true;
+		break;	
+	default:
+		return_value = false;
+	}
+
+	return return_value;
+}
+
+GUID history_restore_mainmenu_commands::get_parent() {
+	return mainmenu_groups::edit;
+}
+
+void history_restore_mainmenu_commands::execute(t_uint32 p_index, service_ptr_t<service_base> p_callback) {
+	TRACK_CALL_TEXT_DEBUG("history_restore_mainmenu_commands::execute");
+	
+	switch(p_index) {
+	case MENU_RESTORE_PLAYLIST:
+		// Most recently deleted playlist is the first element
+		static_api_ptr_t<playlist_manager_v3> playlist_api;
+		if(playlist_api->recycler_get_count()) {
+			playlist_api->recycler_restore(0);
+		}
+		break;	
+	}
+	
+}	
+
+// The standard version of this command does not support checked or disabled
+// commands, so we use our own version.
+bool history_restore_mainmenu_commands::get_display(t_uint32 p_index, pfc::string_base & p_text, t_uint32 & p_flags) {
+	TRACK_CALL_TEXT_DEBUG("history_restore_mainmenu_commands::get_display");	
+
+	p_flags = 0;
+
+	switch(p_index) {
+	case MENU_RESTORE_PLAYLIST:
+		if(!static_api_ptr_t<playlist_manager_v3>()->recycler_get_count()) {
+			p_flags = flag_disabled;
+		}
+		break;	
+	}
+
+	get_name(p_index, p_text);
+	return true;
+}
+
+
+
+
+
 static mainmenu_commands_factory_t< history_mainmenu_commands > history_menu;
+
+static mainmenu_commands_factory_t< history_restore_mainmenu_commands > history_restore_playlist_menu;
 
 static mainmenu_group_popup_factory mainmenu_group(playlisthistory_menu_guid, 
 	mainmenu_groups::view, mainmenu_commands::sort_priority_dontcare, 
