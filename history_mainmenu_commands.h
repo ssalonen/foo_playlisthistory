@@ -2,6 +2,7 @@
 
 #include "stdafx.h"
 
+// Related to playlist activation
 class history_mainmenu_commands : public mainmenu_commands_v2 {
 public:
 	virtual t_uint32 get_command_count();

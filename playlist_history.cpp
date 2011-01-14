@@ -4,8 +4,8 @@
 
 void playlist_history_impl::on_playlist_activate(t_size p_old, t_size p_new) {
 	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlist_activate");	
-	insync(history_sync);
 	if(!update_enabled.get()) return;
+	insync(history_sync);	
 
 	// Remove history entries after the current position
 	if(position_in_history.m_index != pfc::infinite_size) {
@@ -37,8 +37,8 @@ void playlist_history_impl::on_playlist_activate(t_size p_old, t_size p_new) {
 
 void playlist_history_impl::on_playlist_created(t_size p_index, const char *p_name, t_size p_name_len) {
 	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlist_created");
-	insync(history_sync);
-	if(!update_enabled.get()) return;
+	// Accept creations all the time // if(!update_enabled.get()) return;
+	insync(history_sync);	
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_item_created(p_index, p_name, p_name_len);
 	}
@@ -48,8 +48,8 @@ void playlist_history_impl::on_playlist_created(t_size p_index, const char *p_na
 
 void playlist_history_impl::on_playlists_reorder(const t_size *p_order, t_size p_count) {
 	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlists_reorder");
-	insync(history_sync);
-	if(!update_enabled.get()) return;
+	// Accept reorders all the time // if(!update_enabled.get()) return;
+	insync(history_sync);	
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_items_reorder(p_order, p_count);
 	}
@@ -59,8 +59,8 @@ void playlist_history_impl::on_playlists_reorder(const t_size *p_order, t_size p
 
 void playlist_history_impl::on_playlists_removing(const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
 	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlists_removing");
-	insync(history_sync);
-	if(!update_enabled.get()) return;
+	// Accept removals all the time // if(!update_enabled.get()) return;
+	insync(history_sync);	
 	// playlist_manager::get_active_playlist returns infinite at this point for reason if the 
 	// current playlist is removed (-> unambiguity), therefore use playlist history to find out if
 	// the currently active playlist is being removed
@@ -75,8 +75,8 @@ void playlist_history_impl::on_playlists_removing(const bit_array &p_mask, t_siz
 
 void playlist_history_impl::on_playlists_removed(const bit_array &p_mask, t_size p_old_count, t_size p_new_count) {
 	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::on_playlists_removed");
-	insync(history_sync);
 	if(!update_enabled.get()) return;
+	insync(history_sync);	
 	for(t_size i = 0; i < history.get_count(); i++) {
 		history[i].on_items_removed(p_mask, p_old_count, p_new_count);
 	}
