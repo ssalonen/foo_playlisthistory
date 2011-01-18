@@ -97,9 +97,9 @@ void playlist_history_impl::on_playlists_removed(const bit_array &p_mask, t_size
 void playlist_history_impl::activate_previous() {
 	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::activate_previous()");
 	t_size index;
+	insync(history_sync);
 	if(is_previous_valid(index)) {
-		updates_disabled_scope lock(this);
-		insync(history_sync);
+		updates_disabled_scope lock(this);		
 		position_in_history.m_index = index;
 		static_api_ptr_t<playlist_manager>()->set_active_playlist(history[index].m_index);
 	}
@@ -108,9 +108,9 @@ void playlist_history_impl::activate_previous() {
 void playlist_history_impl::activate_next() {
 	TRACK_CALL_TEXT_DEBUG("playlist_history_impl::activate_next()");
 	t_size index;
+	insync(history_sync);
 	if(is_next_valid(index)) {
-		updates_disabled_scope lock(this);
-		insync(history_sync);
+		updates_disabled_scope lock(this);		
 		position_in_history.m_index = index;
 		static_api_ptr_t<playlist_manager>()->set_active_playlist(history[index].m_index);
 	}
