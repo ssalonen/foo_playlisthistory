@@ -11,7 +11,6 @@ DECLARE_COMPONENT_VERSION(
 	// about text, use \n to separate multiple lines
 	// If you don't want any about text, set this parameter to NULL.
 	COMPONENTNAME
-	" for foobar2000 v1.x\n"
 	"\n"
 	"contributors:\n"
 	"Sami Salonen"
